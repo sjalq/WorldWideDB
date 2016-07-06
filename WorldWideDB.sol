@@ -4,6 +4,7 @@ contract WorldWideDB {
         address owner;
         string JSON; //the stored value, preferably represented in JSON format
         uint256 createdOn;
+        uint256 lastRenewed;
 
         uint256 deposit;
 
@@ -12,9 +13,11 @@ contract WorldWideDB {
         uint256 tips;
     }
 
+    //anything starting with an underscore is open season for squatters.
     mapping (string => KeyValue) DB;
 
-    function Create(string key, string JSON) {
+    function Create(string key, string JSON, bool _isContestable) {
+        //anything starting with an underscore is open season for squatters.
         KeyValue val = DB[key];
 
         if (val.owner = 0x00) {
@@ -24,6 +27,7 @@ contract WorldWideDB {
             val.JSON = JSON;
             val.deposit = msg.value;
             val.createdOn = now;
+            val.lastRenewed = now;
 
             DB[key] = val;
         }
@@ -58,9 +62,12 @@ contract WorldWideDB {
 
     //a simple way to keep squatters away
     function Contest(string key, string JSON) {
+        //anything starting with an underscore is open season for squatters.  
+        if (substring(key,0,1) = "_") return;
+    
         KeyValue val = DB[key];
         
-        if (msg.value > (val.deposit * 11)/10 && (now - val.createdOn > 14 days)) 
+        if (msg.value > (val.deposit * 11)/10 && ((now - val.createdOn < 14 days) || (now - val.lastRenewed > 2 years))) 
         {
             address originalOwner = val.owner;
             uint256 originalDeposit = val.deposit;
@@ -70,10 +77,21 @@ contract WorldWideDB {
             val.JSON = JSON;
             val.deposit = newDeposit;
             val.createdOn = now; //reopens the challange period for another 2 weeks
+            val.lastRenewed = now;
 
             DB[key] = val;
 
             originalOwner.send(newDeposit); //compensate the original claimer for their time by giving them at least 50% on top of their current deposit 
+        }
+    }
+    
+    //just keeps things frosty so that valuable real-estate can be reclaimed from dead keys
+    function Renew(string key) {
+        KeyValue val = DB[key]; 
+        
+        if (val.owner != 0x00 && val.owner == msg.sender) {
+            val.lastRenewed = now;
+            DB[key] = val;
         }
     }
 
@@ -81,7 +99,7 @@ contract WorldWideDB {
     function FetchDeposit(string key) {
         KeyValue val = DB[key];
 
-        if (val.owner != 0x00 && val.owner = msg.sender) {
+        if (val.owner != 0x00 && val.owner == msg.sender) {
             uint256 money = val.deposit;
             val.deposit = 0;
             DB[key] = val;
@@ -94,7 +112,7 @@ contract WorldWideDB {
     function Transfer(string key, address newOwner) {
         KeyValue val = DB[key];
 
-        if (val.owner != 0x00 && val.owner = msg.sender){
+        if (val.owner != 0x00 && val.owner == msg.sender){
             val.owner = newOwner;
             DB[key] = val;
         }
@@ -131,7 +149,7 @@ contract WorldWideDB {
     function FetchTip(string key) {
         KeyValue val = DB[key];
 
-        if (val.owner != 0x00 && val.owner = msg.sender) {
+        if (val.owner != 0x00 && val.owner == msg.sender) {
             uint256 money = val.tips;
             val.tips = 0;
             DB[key] = val;
